@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,6 +62,14 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				streetmeat: {
+					primary: '#F97316', // bright orange
+					secondary: '#D946EF', // magenta pink
+					accent: '#8B5CF6', // vivid purple
+					background: '#1A1F2C', // dark purple
+					text: '#F1F0FB', // soft gray
+					muted: '#8E9196', // neutral gray
 				}
 			},
 			borderRadius: {
