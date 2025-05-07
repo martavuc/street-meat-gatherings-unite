@@ -64,12 +64,12 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				},
 				streetmeat: {
-					primary: '#F97316', // bright orange
-					secondary: '#D946EF', // magenta pink
-					accent: '#8B5CF6', // vivid purple
-					background: '#1A1F2C', // dark purple
-					text: '#F1F0FB', // soft gray
-					muted: '#8E9196', // neutral gray
+					primary: '#8C1515', // Stanford Cardinal Red
+					secondary: '#175E54', // Stanford Green
+					accent: '#2F2424', // Dark Brown/Black
+					background: '#2F2424', // Dark background
+					text: '#FFFFFF', // White text
+					muted: '#DAD7CB', // Stanford Light Sandstone
 				}
 			},
 			borderRadius: {
