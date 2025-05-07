@@ -8,7 +8,7 @@ const Home: React.FC = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-background">
       <div
         className="flex-1 flex flex-col items-center justify-center bg-cover bg-center text-center p-6"
         style={{
