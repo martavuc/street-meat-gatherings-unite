@@ -2,7 +2,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { MapPin, MessageCircle, Heart } from "lucide-react";
+import { MapPin, MessageCircle, Heart, Calendar } from "lucide-react";
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
@@ -16,7 +16,11 @@ const Home: React.FC = () => {
         }}
       >
         <h1 className="street-meat-title mb-6">STREET MEAT EVENT</h1>
-        <p className="street-meat-subtitle mb-8">Join us for the ultimate street food experience!</p>
+        <p className="street-meat-subtitle mb-2">Join us for the ultimate street food experience at Stanford!</p>
+        <div className="flex items-center justify-center space-x-2 mb-8">
+          <Calendar className="h-5 w-5 text-streetmeat-primary" />
+          <p className="text-white font-medium">May 31st, 2025</p>
+        </div>
 
         <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 mb-8">
           <Button 
