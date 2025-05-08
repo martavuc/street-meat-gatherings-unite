@@ -1,26 +1,20 @@
-
 import { Comment, PickupLocation, User } from "../types";
 
 export const pickupLocations: PickupLocation[] = [
   {
     id: "loc1",
-    name: "Downtown Food Court",
-    address: "123 Main Street"
+    name: "Mars",
+    address: "Stanford Campus"
   },
   {
     id: "loc2",
-    name: "Riverside Park",
-    address: "456 River Road"
+    name: "Kappa Sigma",
+    address: "Stanford Campus"
   },
   {
     id: "loc3",
-    name: "Central Plaza",
-    address: "789 Center Avenue"
-  },
-  {
-    id: "loc4",
-    name: "Beach Boardwalk",
-    address: "321 Coastal Highway"
+    name: "EVGR",
+    address: "Stanford Campus"
   }
 ];
 

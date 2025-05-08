@@ -5,17 +5,23 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Heart, MessageCircle } from "lucide-react";
+import { Heart, MessageCircle, UserX, Trash2 } from "lucide-react";
 import { useEventContext } from "@/context/EventContext";
 import { Separator } from "@/components/ui/separator";
 import { formatDistanceToNow } from "date-fns";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface UserCardProps {
   user: User;
 }
 
 const UserCard: React.FC<UserCardProps> = ({ user }) => {
-  const { comments, addComment, toggleLike, currentUser } = useEventContext();
+  const { comments, addComment, toggleLike, currentUser, isAdmin, removeUser, removeComment } = useEventContext();
   const [newComment, setNewComment] = useState("");
   const [showComments, setShowComments] = useState(false);
 
@@ -66,10 +72,35 @@ const UserCard: React.FC<UserCardProps> = ({ user }) => {
             <AvatarImage src={user.imageUrl} />
             <AvatarFallback className="text-lg">{getInitials(user.name)}</AvatarFallback>
           </Avatar>
-          <h3 className="mt-2 text-xl font-semibold">{user.name}</h3>
+          <div className="flex items-center mt-2">
+            <h3 className="text-xl font-semibold">{user.name}</h3>
+            {isAdmin && user.id !== currentUser && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 ml-1">
+                    <UserX className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem 
+                    className="text-destructive focus:text-destructive"
+                    onClick={() => removeUser(user.id)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Remove User
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground">
             Pickup at: <span className="font-medium">{user.pickupLocation}</span>
           </p>
+          {user.timeSlot && (
+            <p className="text-sm text-muted-foreground mt-1">
+              Time: <span className="font-medium">{user.timeSlot}</span>
+            </p>
+          )}
           <p className="text-xs text-muted-foreground mt-1">
             Joined {formatDistanceToNow(new Date(user.createdAt), { addSuffix: true })}
           </p>
@@ -92,17 +123,29 @@ const UserCard: React.FC<UserCardProps> = ({ user }) => {
             {userComments.length > 0 ? (
               userComments.map((comment) => (
                 <div key={comment.id} className="border rounded-md p-3">
-                  <div className="flex items-center space-x-2">
-                    <Avatar className="h-6 w-6">
-                      <AvatarImage src={comment.authorImageUrl} />
-                      <AvatarFallback className="text-xs">
-                        {getInitials(comment.authorName)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm font-medium">{comment.authorName}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
-                    </span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Avatar className="h-6 w-6">
+                        <AvatarImage src={comment.authorImageUrl} />
+                        <AvatarFallback className="text-xs">
+                          {getInitials(comment.authorName)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm font-medium">{comment.authorName}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
+                      </span>
+                    </div>
+                    {isAdmin && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-6 w-6" 
+                        onClick={() => removeComment(comment.id)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    )}
                   </div>
                   <p className="mt-2 text-sm">{comment.content}</p>
                   <div className="mt-2 flex items-center">

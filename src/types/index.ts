@@ -5,6 +5,8 @@ export interface User {
   imageUrl: string;
   pickupLocation: string;
   createdAt: string;
+  timeSlot?: string;
+  isAdmin?: boolean;
 }
 
 export interface Comment {
@@ -23,4 +25,9 @@ export interface PickupLocation {
   id: string;
   name: string;
   address: string;
+}
+
+export interface TimeSlot {
+  id: string;
+  time: string;
 }
