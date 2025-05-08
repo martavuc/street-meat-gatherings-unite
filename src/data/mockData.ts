@@ -1,3 +1,4 @@
+
 import { Comment, PickupLocation, User } from "../types";
 
 export const pickupLocations: PickupLocation[] = [
@@ -23,21 +24,21 @@ export const users: User[] = [
     id: "user1",
     name: "Jamie Smith",
     imageUrl: "https://source.unsplash.com/random/300x300/?portrait",
-    pickupLocation: "Downtown Food Court",
+    pickupLocation: "Mars",
     createdAt: "2025-05-01T12:00:00Z"
   },
   {
     id: "user2",
     name: "Alex Johnson",
     imageUrl: "https://source.unsplash.com/random/300x300/?person",
-    pickupLocation: "Riverside Park",
+    pickupLocation: "Kappa Sigma",
     createdAt: "2025-05-01T14:30:00Z"
   },
   {
     id: "user3",
     name: "Jordan Lee",
     imageUrl: "https://source.unsplash.com/random/300x300/?face",
-    pickupLocation: "Central Plaza",
+    pickupLocation: "EVGR",
     createdAt: "2025-05-01T15:45:00Z"
   }
 ];
