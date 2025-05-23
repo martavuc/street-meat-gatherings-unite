@@ -76,6 +76,39 @@ export const comments: Comment[] = [
     createdAt: "2025-05-01T18:05:00Z",
     likes: 0,
     likedBy: []
+  },
+  {
+    id: "comment4",
+    userId: "user1",
+    authorId: "user1",
+    authorName: "Jamie Smith",
+    authorImageUrl: "https://source.unsplash.com/random/300x300/?portrait",
+    content: "Mars squad, what time are people planning to arrive?",
+    createdAt: "2025-05-01T19:10:00Z",
+    likes: 1,
+    likedBy: ["user3"]
+  },
+  {
+    id: "comment5",
+    userId: "user2",
+    authorId: "user2",
+    authorName: "Alex Johnson",
+    authorImageUrl: "https://source.unsplash.com/random/300x300/?person",
+    content: "Kappa Sig party before the pickup?",
+    createdAt: "2025-05-01T20:25:00Z",
+    likes: 0,
+    likedBy: []
+  },
+  {
+    id: "comment6",
+    userId: "user3",
+    authorId: "user3",
+    authorName: "Jordan Lee",
+    authorImageUrl: "https://source.unsplash.com/random/300x300/?face",
+    content: "EVGR people - anyone wants to walk together?",
+    createdAt: "2025-05-01T21:40:00Z",
+    likes: 1,
+    likedBy: ["user1"]
   }
 ];
 

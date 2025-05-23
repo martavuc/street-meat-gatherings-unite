@@ -5,6 +5,7 @@ import UserCard from "@/components/UserCard";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import LocationChat from "@/components/LocationChat";
 
 const Community: React.FC = () => {
   const { users, currentUser, pickupLocations } = useEventContext();
@@ -39,13 +40,38 @@ const Community: React.FC = () => {
           ))}
         </TabsList>
 
-        <TabsContent value={activeTab}>
-          {filteredUsers.length === 0 ? (
+        {pickupLocations.map(location => (
+          <TabsContent key={location.id} value={location.name}>
+            {filteredUsers.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-xl text-muted-foreground mb-4">
+                  No one has signed up for {location.name} yet. Be the first!
+                </p>
+                <Button 
+                  onClick={() => navigate("/signup")}
+                  className="bg-streetmeat-primary hover:bg-streetmeat-accent"
+                >
+                  Sign Up Now
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredUsers.map((user) => (
+                    <UserCard key={user.id} user={user} />
+                  ))}
+                </div>
+                <LocationChat locationName={location.name} />
+              </>
+            )}
+          </TabsContent>
+        ))}
+
+        <TabsContent value="all">
+          {users.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-xl text-muted-foreground mb-4">
-                {activeTab === "all" 
-                  ? "No one has signed up yet. Be the first!" 
-                  : `No one has signed up for ${activeTab} yet. Be the first!`}
+                No one has signed up yet. Be the first!
               </p>
               <Button 
                 onClick={() => navigate("/signup")}
@@ -55,11 +81,14 @@ const Community: React.FC = () => {
               </Button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredUsers.map((user) => (
-                <UserCard key={user.id} user={user} />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {users.map((user) => (
+                  <UserCard key={user.id} user={user} />
+                ))}
+              </div>
+              <LocationChat locationName="all" />
+            </>
           )}
         </TabsContent>
       </Tabs>
