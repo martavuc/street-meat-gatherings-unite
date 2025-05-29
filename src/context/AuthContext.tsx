@@ -82,8 +82,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const register = async (name: string, email: string, password: string) => {
     try {
-      await authAPI.register({ name, email, password });
-      await login(email);
+      const response = await authAPI.register({ name, email, password });
+      const loginResponse = await authAPI.login(email, password);
+      login(loginResponse.access_token);
       
       toast({
         title: "Welcome!",

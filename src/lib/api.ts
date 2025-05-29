@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8000/api';
+const API_URL = '/api';
 
 // Create axios instance with default config
 const api = axios.create({
@@ -94,7 +94,9 @@ export const authAPI = {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
     });
-    return response.data;
+    return {
+      access_token: response.data.access_token || response.data.token,
+    };
   },
 
   getCurrentUser: async () => {
