@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { User } from "@/types";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
@@ -25,7 +24,7 @@ const UserCard: React.FC<UserCardProps> = ({ user }) => {
   const [newComment, setNewComment] = useState("");
   const [showComments, setShowComments] = useState(false);
 
-  const userComments = comments.filter((comment) => comment.userId === user.id);
+  const userComments = comments.filter((comment) => comment.userId === user.id.toString());
 
   const handleAddComment = () => {
     if (!currentUser) {
@@ -36,7 +35,7 @@ const UserCard: React.FC<UserCardProps> = ({ user }) => {
     if (newComment.trim() === "") return;
     
     addComment({
-      userId: user.id,
+      userId: user.id.toString(),
       authorId: currentUser,
       content: newComment,
     });
@@ -69,12 +68,12 @@ const UserCard: React.FC<UserCardProps> = ({ user }) => {
       <CardContent className="p-6 -mt-12">
         <div className="flex flex-col items-center">
           <Avatar className="w-24 h-24 border-4 border-background">
-            <AvatarImage src={user.imageUrl} />
+            <AvatarImage src={user.image_url} />
             <AvatarFallback className="text-lg">{getInitials(user.name)}</AvatarFallback>
           </Avatar>
           <div className="flex items-center mt-2">
             <h3 className="text-xl font-semibold">{user.name}</h3>
-            {isAdmin && user.id !== currentUser && (
+            {isAdmin && user.id.toString() !== currentUser && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8 ml-1">
@@ -84,7 +83,7 @@ const UserCard: React.FC<UserCardProps> = ({ user }) => {
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem 
                     className="text-destructive focus:text-destructive"
-                    onClick={() => removeUser(user.id)}
+                    onClick={() => removeUser(user.id.toString())}
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
                     Remove User
@@ -94,15 +93,15 @@ const UserCard: React.FC<UserCardProps> = ({ user }) => {
             )}
           </div>
           <p className="text-sm text-muted-foreground">
-            Pickup at: <span className="font-medium">{user.pickupLocation}</span>
+            Pickup at: <span className="font-medium">{user.pickup_location}</span>
           </p>
-          {user.timeSlot && (
+          {user.time_slot && (
             <p className="text-sm text-muted-foreground mt-1">
-              Time: <span className="font-medium">{user.timeSlot}</span>
+              Time: <span className="font-medium">{user.time_slot}</span>
             </p>
           )}
           <p className="text-xs text-muted-foreground mt-1">
-            Joined {formatDistanceToNow(new Date(user.createdAt), { addSuffix: true })}
+            Joined {formatDistanceToNow(new Date(user.created_at), { addSuffix: true })}
           </p>
         </div>
 

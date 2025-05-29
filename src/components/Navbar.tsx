@@ -1,12 +1,11 @@
-
 import React from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { MapPin } from "lucide-react";
-import { useEventContext } from "@/context/EventContext";
+import { useAuth } from "@/context/AuthContext";
 
 const Navbar: React.FC = () => {
-  const { currentUser } = useEventContext();
+  const { user, logout } = useAuth();
 
   return (
     <nav className="bg-white py-4 px-6 shadow-md">
@@ -23,9 +22,11 @@ const Navbar: React.FC = () => {
               Home
             </Button>
           </Link>
-          <Link to="/signup">
+          {user ? (
+            <>
+              <Link to="/order">
             <Button variant="ghost" className="text-gray-600 hover:text-white hover:bg-streetmeat-primary">
-              Sign Up
+                  Order
             </Button>
           </Link>
           <Link to="/community">
@@ -33,12 +34,27 @@ const Navbar: React.FC = () => {
               Community
             </Button>
           </Link>
-          {currentUser && (
-            <Link to="/my-profile">
-              <Button variant="outline" className="text-gray-700 border-streetmeat-accent hover:bg-streetmeat-accent hover:text-white">
-                My Profile
+              <Button
+                variant="outline"
+                className="text-gray-700 border-streetmeat-accent hover:bg-streetmeat-accent hover:text-white"
+                onClick={logout}
+              >
+                Logout
+              </Button>
+            </>
+          ) : (
+            <>
+              <Link to="/login">
+                <Button variant="ghost" className="text-gray-600 hover:text-white hover:bg-streetmeat-primary">
+                  Login
+                </Button>
+              </Link>
+              <Link to="/signup">
+                <Button variant="ghost" className="text-gray-600 hover:text-white hover:bg-streetmeat-primary">
+                  Sign Up
               </Button>
             </Link>
+            </>
           )}
         </div>
       </div>

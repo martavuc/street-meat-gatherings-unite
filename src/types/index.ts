@@ -1,12 +1,13 @@
-
 export interface User {
-  id: string;
+  id: number;
   name: string;
-  imageUrl: string;
-  pickupLocation: string;
-  createdAt: string;
-  timeSlot?: string;
-  isAdmin?: boolean;
+  email?: string;
+  image_url?: string;
+  pickup_location: string;
+  time_slot?: string;
+  is_admin: boolean;
+  created_at: string;
+  updated_at?: string;
 }
 
 export interface Comment {
@@ -14,7 +15,7 @@ export interface Comment {
   userId: string;
   authorId: string;
   authorName: string;
-  authorImageUrl: string;
+  authorImageUrl?: string;
   content: string;
   createdAt: string;
   likes: number;
@@ -22,12 +23,14 @@ export interface Comment {
 }
 
 export interface PickupLocation {
-  id: string;
+  id: number;
   name: string;
   address: string;
+  created_at: string;
 }
 
 export interface TimeSlot {
-  id: string;
+  id: number;
   time: string;
+  created_at: string;
 }
