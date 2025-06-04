@@ -10,10 +10,10 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware   # ← new
 
-from .database import engine, Base
-from .auth import router as auth_router
-from .routes import menu
-from .routes import social_feed
+from backend.database import engine, Base
+from backend.auth import router as auth_router
+from backend.routes import menu
+from backend.routes import social_feed
 
 # import menu routes (after app is created)
 

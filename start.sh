@@ -13,5 +13,5 @@ fi
 
 # Start the server
 echo "Starting FastAPI server on port $PORT"
-cd backend
-uvicorn main:app --host 0.0.0.0 --port $PORT 
+cd ..
+PYTHONPATH=$PYTHONPATH:. uvicorn backend.main:app --host 0.0.0.0 --port $PORT 
