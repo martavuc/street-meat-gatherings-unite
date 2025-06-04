@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { authAPI } from '@/lib/api';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import LayoutWithHotDogs from '@/components/LayoutWithHotDogs';
 
 const Signup = () => {
   const [name, setName] = useState('');
@@ -19,6 +20,15 @@ const Signup = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (password.length < 8) {
+      toast({
+        title: "Password too short",
+        description: "Password must be at least 8 characters long.",
+        variant: "destructive",
+      });
+      return;
+    }
     setIsLoading(true);
     console.log('Starting signup process...');
 
@@ -30,18 +40,17 @@ const Signup = () => {
       console.log('Registration successful, attempting to login...');
       
       // Login after successful registration
-      const loginResponse = await authAPI.login(email, password);
-      console.log('Login successful, got token:', loginResponse);
-      
-      login(loginResponse.access_token);
-      console.log('Token stored, showing success toast...');
-      
+      const { access_token } = await authAPI.login(email, password);
+      await login(access_token);
+
+      const orders = await authAPI.getMyOrders();
+      const dest = orders.length ? "/community" : "/order";
+
       toast({
         title: "Success!",
         description: "Your account has been created successfully.",
       });
-      console.log('Navigating to order page...');
-      navigate('/order');
+      navigate(dest);
     } catch (error: any) {
       console.error('Signup failed:', error);
       console.error('Error details:', {
@@ -60,9 +69,9 @@ const Signup = () => {
   };
 
   return (
-    <div className="container mx-auto py-12 px-4">
-      <div className="max-w-md mx-auto">
-        <Card>
+    <LayoutWithHotDogs>
+    <div className="min-h-screen flex items-start justify-center pt-20 px-4">
+    <Card className="w-full max-w-md rounded-3xl shadow-2xl bg-white/10 backdrop-blur-md">
           <CardHeader>
             <CardTitle>Sign Up</CardTitle>
             <CardDescription>
@@ -126,7 +135,7 @@ const Signup = () => {
           </form>
         </Card>
       </div>
-    </div>
+    </LayoutWithHotDogs>
   );
 };
 

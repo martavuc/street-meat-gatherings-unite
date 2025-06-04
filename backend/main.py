@@ -1,48 +1,61 @@
+"""
+backend/main.py
+FastAPI entry-point
+"""
+
+from __future__ import annotations
+
+from contextlib import asynccontextmanager   # ← new
+from dotenv import load_dotenv
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-import uvicorn
-import models  
-from database import engine, Base
-from routes import auth, social_feed, websocket, menu
+from fastapi.middleware.cors import CORSMiddleware   # ← new
 
-Base.metadata.create_all(bind=engine)
+from .database import engine, Base
+from .auth import router as auth_router
+from .routes import menu
+from .routes import social_feed
 
+# import menu routes (after app is created)
+
+load_dotenv()  # picks up DATABASE_URL, SECRET_KEY, etc.
+
+
+# ────────────────── DB init on startup ──────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create database tables
-    Base.metadata.create_all(bind=engine)
-    yield
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
+        # ── Lightweight migration for newly-added columns ──────────────────
+        from sqlalchemy import text
+
+# ── Create 'details' column on SQLite if it isn't there already ──
+        result = await conn.execute(text("PRAGMA table_info(orders)"))
+        cols = [row[1] for row in result]
+        if "details" not in cols:
+            await conn.execute(text("ALTER TABLE orders ADD COLUMN details TEXT"))
+    yield
+# ────────────────────────────────────────────────────────────────
 
 app = FastAPI(
-    title="Street Meat Event API",
-    description="Backend for Street Meat Event Community Platform",
-    version="1.0.0",
-    lifespan=lifespan
+    title="Street Meat API",
+    lifespan=lifespan,   # tells FastAPI to run the block above
 )
-app.include_router(auth.router, prefix="/api/auth")
 
-# Configure CORS
+# CORS so your Vite dev-server (localhost:5173) can hit the API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://localhost:8080"],  # Added port 8080
+    allow_origins=["http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
-app.include_router(social_feed.router, prefix="/api/social", tags=["social"])
-app.include_router(websocket.router, tags=["websocket"])
-app.include_router(menu.router, prefix="/api/menu", tags=["menu"])
+# All the routes you've already built
+app.include_router(auth_router)
 
+# Street-Meat menu / order endpoints
+app.include_router(menu.router, prefix="/api")
 
-@app.get("/")
-async def root():
-    return {"message": "Street Meat Event API"}
-
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000) 
+# Social feed endpoints
+app.include_router(social_feed.router, prefix="/api/social")

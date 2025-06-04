@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '@/lib/api';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 interface User {
   id: number;
@@ -21,6 +21,7 @@ interface AuthContextType {
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   hasOrder: boolean;
+  refreshOrders: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -39,11 +40,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       authAPI.getCurrentUser()
         .then(userData => {
           setUser(userData);
+          if (userData.pickup_location) {
+            localStorage.setItem("user_pickup_location", userData.pickup_location);
+          }
           
           // Check if user has an order
           authAPI.getMyOrders()
             .then(orders => {
               setHasOrder(orders.length > 0);
+              if (orders.length) {
+                localStorage.setItem("user_pickup_location", orders[0].pickup_location);
+              }
             })
             .catch(() => {
               localStorage.removeItem('token');
@@ -60,24 +67,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, []);
 
-  const login = (token: string) => {
-    localStorage.setItem('token', token);
-    authAPI.getCurrentUser()
-      .then(userData => {
-        setUser(userData);
-        
-        // Check if user has an order
-        authAPI.getMyOrders()
-          .then(orders => {
-            setHasOrder(orders.length > 0);
-          })
-          .catch(() => {
-            localStorage.removeItem('token');
-          });
-      })
-      .catch(() => {
-        localStorage.removeItem('token');
-      });
+  const login = async (token: string) => {
+    localStorage.setItem("token", token);
+
+    try {
+      const me = await authAPI.getCurrentUser();
+      setUser(me);
+      if (me.pickup_location) {
+        localStorage.setItem("user_pickup_location", me.pickup_location);
+      }
+
+      const orders = await authAPI.getMyOrders();
+      setHasOrder(orders.length > 0);
+      if (orders.length) {
+        localStorage.setItem("user_pickup_location", orders[0].pickup_location);
+      }
+    } catch {
+      localStorage.removeItem("token");
+      throw new Error("token invalid");        // surface errors if you like
+    }
+    /* <--  nothing returned, but because the
+            function is async it resolves to a Promise<void>
+            that callers can await                       */
   };
 
   const register = async (name: string, email: string, password: string) => {
@@ -101,8 +112,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const refreshOrders = async () => {
+    if (!token) return;
+    try {
+      const orders = await authAPI.getMyOrders();
+      setHasOrder(orders.length > 0);
+      if (orders.length) {
+        localStorage.setItem("user_pickup_location", orders[0].pickup_location);
+      }
+    } catch (e) {
+      console.error("failed to refresh orders", e);
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem("user_pickup_location");
     setUser(null);
     setHasOrder(false);
     navigate('/');
@@ -123,6 +148,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         register,
         logout,
         hasOrder,
+        refreshOrders,
       }}
     >
       {children}

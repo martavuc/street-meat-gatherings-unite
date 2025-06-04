@@ -1,10 +1,10 @@
-
 import React from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Comment } from "@/types";
 import { formatDistanceToNow } from "date-fns";
 import { Heart } from "lucide-react";
 import { useEventContext } from "@/context/EventContext";
+import logoPng from "/logo.png";
 
 interface CommentItemProps {
   comment: Comment;
@@ -25,7 +25,14 @@ const CommentItem: React.FC<CommentItemProps> = ({ comment }) => {
           <div>
             <span className="font-semibold">{comment.authorName}</span>
             <span className="text-xs text-muted-foreground ml-2">
-              {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
+              {formatDistanceToNow(
+                (() => {
+                  const iso = comment.createdAt as unknown as string;
+                  // append Z if missing timezone to treat as UTC
+                  return new Date(/([+-]\d\d:?\d\d|Z)$/i.test(iso) ? iso : `${iso}Z`);
+                })(),
+                { addSuffix: true }
+              )}
             </span>
           </div>
           {isAdmin && (

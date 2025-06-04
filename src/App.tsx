@@ -8,11 +8,13 @@ import Signup from './pages/Signup';
 import Community from './pages/Community';
 import OrderWizard from './pages/OrderWizard';
 import ProtectedRoute from './components/ProtectedRoute';
+import { EventProvider } from './context/EventContext';
 
 function App() {
   return (
     <Router>
       <AuthProvider>
+        <EventProvider>
         <div className="min-h-screen bg-background">
           <Navbar />
           <main>
@@ -40,6 +42,7 @@ function App() {
           </main>
           <Toaster />
         </div>
+        </EventProvider>
       </AuthProvider>
     </Router>
 );

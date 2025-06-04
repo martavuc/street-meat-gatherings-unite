@@ -4,19 +4,15 @@ const API_URL = '/api';
 
 // Create axios instance with default config
 const api = axios.create({
-  baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  // keep the proxy-friendly baseURL, but allow an env override when you deploy
+  baseURL: import.meta.env.VITE_API_URL ?? "/api",
+  headers: { "Content-Type": "application/json" },
 });
 
-// Add request interceptor to add auth token
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
+api.interceptors.request.use(cfg => {
+  const token = localStorage.getItem("token");   
+  if (token) cfg.headers.Authorization = `Bearer ${token}`;
+  return cfg;
 });
 
 // Types
@@ -28,6 +24,30 @@ export interface User {
   pickup_location: string;
   time_slot?: string;
   is_admin: boolean;
+  created_at: string;
+  updated_at?: string;
+  orders?: Order[];
+}
+
+export interface Order {
+  id: number;
+  user_id: number;
+  menu_item_id: number;
+  pickup_location: string;
+  time_slot: string;
+  details?: string;
+  status: string;
+  created_at: string;
+  updated_at?: string;
+  menu_item: MenuItem;
+}
+
+export interface MenuItem {
+  id: number;
+  name: string;
+  description: string;
+  price: string;
+  is_available: boolean;
   created_at: string;
   updated_at?: string;
 }
@@ -80,29 +100,22 @@ export interface LikeResponse {
 
 // Auth API
 export const authAPI = {
-  register: async (userData: { name: string; email: string; password: string }) => {
-    const response = await api.post('/auth/register', userData);
-    return response.data;
-  },
+  /** POST /api/auth/register  — JSON body */
+  register: (u: { name: string; email: string; password: string }) =>
+    api.post("/auth/register", u).then(r => r.data),
 
-  login: async (email: string, password: string) => {
-    const formData = new FormData();
-    formData.append('username', email);
-    formData.append('password', password);
-    const response = await api.post('/auth/token', formData, {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-    });
-    return {
-      access_token: response.data.access_token || response.data.token,
-    };
-  },
+  /** POST /api/auth/login  — x-www-form-urlencoded */
+  login: (email: string, password: string) =>
+    api
+      .post(
+        "/auth/login",
+        new URLSearchParams({ username: email, password }),
+        { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+      )
+      .then(r => ({ access_token: r.data.access_token })),
 
-  getCurrentUser: async () => {
-    const response = await api.get('/auth/me');
-    return response.data;
-  },
+  /** GET /api/auth/me  */
+  getCurrentUser: () => api.get("/auth/me").then(r => r.data),
 
   updateUser: async (userData: any) => {
     const response = await api.put('/auth/me', userData);
@@ -133,7 +146,7 @@ export const authAPI = {
 // Menu API
 export const menuAPI = {
   getTodaysMenu: () => api.get('/menu/today').then(res => res.data),
-  createOrder: (orderData: { menu_item_id: number; pickup_location: string; time_slot: string; }) =>
+  createOrder: (orderData: { menu_item_id: number; pickup_location: string; time_slot: string; details?: string }) =>
     api.post('/orders', orderData).then(res => res.data),
   getMyOrders: () => api.get('/orders/me').then(res => res.data),
   getOrder: (orderId: number) => api.get(`/orders/${orderId}`).then(res => res.data),
@@ -143,9 +156,12 @@ export const menuAPI = {
 
 // Social Feed API
 export const socialAPI = {
-  getPosts: async (locationFilter?: string) => {
+  getPosts: async (locationFilter?: string, userId?: number) => {
     const response = await api.get('/social/posts', {
-      params: { location_filter: locationFilter },
+      params: {
+        location_filter: locationFilter,
+        user_id: userId,
+      },
     });
     return response.data;
   },
@@ -177,6 +193,16 @@ export const socialAPI = {
 
   likeComment: async (postId: number, commentId: number) => {
     const response = await api.post(`/social/posts/${postId}/comments/${commentId}/like`);
+    return response.data;
+  },
+
+  getUsersByLocation: async (location: string) => {
+    const response = await api.get(`/social/users-by-location/${location}`);
+    return response.data;
+  },
+
+  createUserProfilePost: async (userId: number, location: string) => {
+    const response = await api.post(`/social/user-profile-post/${userId}?location=${location}`);
     return response.data;
   },
 };

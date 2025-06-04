@@ -1,7 +1,7 @@
 import asyncio
 from sqlalchemy.orm import Session
 from database import SessionLocal, engine
-from models import Base, User, PickupLocation, TimeSlot, Post, Comment
+from models import Base, User, PickupLocation, TimeSlot, Post, Comment, MenuItem        
 
 
 def seed_database():
@@ -144,6 +144,31 @@ def seed_database():
         # Add some likes to comments
         comments[0].liked_by.append(users[0])
         comments[1].liked_by.append(users[1])
+
+
+        menu_items = [
+        MenuItem(
+            name="Spicy Chicken Tacos with Adobo Marinade",
+            description="Three tacos on fresh-made corn tortillas.",
+            price="$8.00",
+            is_available=True,
+            pickup_location="Mars",
+            time_slot="12:00 PM - 12:30 PM"
+        ),
+        MenuItem(
+            name="Bacon-Wrapped Hot Dog",
+            description="All-beef dog, apple-wood bacon, grilled onions & peppers.",
+            price="$5.00",
+            is_available=True,
+            pickup_location="Kappa Sigma",
+            time_slot="12:30 PM - 1:00 PM"
+        ),
+        ]
+
+        db.add_all(menu_items)
+
+
+
         
         db.commit()
         print("Database seeded successfully!")

@@ -2,7 +2,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from typing import Dict, List, Optional
 import json
 import asyncio
-from schemas import WebSocketMessage
+from ..schemas import WebSocketMessage
 
 router = APIRouter()
 

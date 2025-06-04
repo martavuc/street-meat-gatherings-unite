@@ -1,29 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 import json
 
-from database import get_db
-from models import Post as PostModel, Comment as CommentModel, User as UserModel
-from schemas import (
+from ..database import get_db
+from ..auth import get_current_user
+from ..models import Post as PostModel, Comment as CommentModel, User as UserModel, Order as OrderModel, MenuItem as MenuItemModel
+from ..schemas import (
     Post, PostCreate, PostUpdate, PostWithLikeStatus,
     Comment, CommentCreate, CommentUpdate, CommentWithLikeStatus,
-    LikeResponse, WebSocketMessage
+    LikeResponse
 )
-from .websocket import websocket_manager
 
 router = APIRouter()
-
-
-def get_current_user(user_id: int, db: Session) -> UserModel:
-    """Helper function to get current user"""
-    user = db.query(UserModel).filter(UserModel.id == user_id).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    return user
 
 
 @router.get("/posts", response_model=List[PostWithLikeStatus])
@@ -32,12 +23,15 @@ async def get_posts(
     user_id: Optional[int] = Query(None),
     limit: int = Query(20, le=100),
     offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get posts with optional location filtering"""
-    query = db.query(PostModel).options(
+    query = select(PostModel).options(
         joinedload(PostModel.author),
         joinedload(PostModel.comments).joinedload(CommentModel.author),
+        joinedload(PostModel.comments).joinedload(CommentModel.liked_by),
+        joinedload(PostModel.comments).joinedload(CommentModel.replies).joinedload(CommentModel.author),
+        joinedload(PostModel.comments).joinedload(CommentModel.replies).joinedload(CommentModel.liked_by),
         joinedload(PostModel.liked_by)
     )
     
@@ -47,7 +41,8 @@ async def get_posts(
             (PostModel.location_filter.is_(None))
         )
     
-    posts = query.order_by(PostModel.created_at.desc()).offset(offset).limit(limit).all()
+    result = await db.execute(query.order_by(PostModel.created_at.desc()).offset(offset).limit(limit))
+    posts = result.unique().scalars().all()
     
     # Add like status for current user
     posts_with_like_status = []
@@ -60,41 +55,126 @@ async def get_posts(
     return posts_with_like_status
 
 
+@router.get("/users-by-location/{location}")
+async def get_users_by_location(
+    location: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get all users picking up at a specific location with their orders"""
+    query = (
+        select(UserModel)
+        .join(OrderModel)
+        .join(MenuItemModel)
+        .options(joinedload(UserModel.orders).joinedload(OrderModel.menu_item))
+        .filter(OrderModel.pickup_location == location)
+    )
+    result = await db.execute(query)
+    users = result.unique().scalars().all()
+    return users
+
+
+@router.post("/user-profile-post/{user_id}")
+async def create_or_get_user_profile_post(
+    user_id: int,
+    location: str,
+    current_user: UserModel = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Create or get a user's profile post for a specific location"""
+    # Check if user profile post already exists for this location
+    result = await db.execute(
+        select(PostModel).filter(
+            PostModel.author_id == user_id,
+            PostModel.content.like("USER_PROFILE:%"),
+            PostModel.location_filter == location
+        )
+    )
+    existing_post = result.scalar_one_or_none()
+    
+    if existing_post:
+        # Reload with relationships
+        rel = select(PostModel).options(
+            joinedload(PostModel.author),
+            joinedload(PostModel.comments).joinedload(CommentModel.author),
+            joinedload(PostModel.comments).joinedload(CommentModel.liked_by),
+            joinedload(PostModel.liked_by)
+        ).filter(PostModel.id == existing_post.id)
+        res_rel = await db.execute(rel)
+        return res_rel.unique().scalar_one()
+    
+    # Get user info
+    user_result = await db.execute(select(UserModel).filter(UserModel.id == user_id))
+    user = user_result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Get user's order for this location
+    order_result = await db.execute(
+        select(OrderModel)
+        .options(joinedload(OrderModel.menu_item))
+        .filter(
+            OrderModel.user_id == user_id,
+            OrderModel.pickup_location == location
+        )
+        .limit(1)
+    )
+    order = order_result.scalar_one_or_none()
+    
+    order_info = f" - Ordered: {order.menu_item.name}" if order else ""
+    
+    # Create profile post
+    profile_post = PostModel(
+        content=f"USER_PROFILE: {user.name}{order_info}",
+        author_id=user_id,
+        location_filter=location
+    )
+    
+    db.add(profile_post)
+    await db.commit()
+    await db.refresh(profile_post)
+    
+    # Return with relationships
+    rel = select(PostModel).options(
+        joinedload(PostModel.author),
+        joinedload(PostModel.comments).joinedload(CommentModel.author),
+        joinedload(PostModel.comments).joinedload(CommentModel.liked_by),
+        joinedload(PostModel.liked_by)
+    ).filter(PostModel.id == profile_post.id)
+    res_rel = await db.execute(rel)
+    return res_rel.unique().scalar_one()
+
+
 @router.post("/posts", response_model=PostWithLikeStatus)
 async def create_post(
     post: PostCreate, 
-    user_id: int,
-    db: Session = Depends(get_db)
+    current_user: UserModel = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
     """Create a new post"""
-    user = get_current_user(user_id, db)
-    
     # Create new post
     db_post = PostModel(
         content=post.content,
         location_filter=post.location_filter,
-        author_id=user_id
+        author_id=current_user.id
     )
     db.add(db_post)
-    db.commit()
-    db.refresh(db_post)
+    await db.commit()
+    await db.refresh(db_post)
     
     # Load relationships
-    db_post = db.query(PostModel).options(
-        joinedload(PostModel.author),
-        joinedload(PostModel.comments).joinedload(CommentModel.author),
-        joinedload(PostModel.liked_by)
-    ).filter(PostModel.id == db_post.id).first()
+    result = await db.execute(
+        select(PostModel).options(
+            joinedload(PostModel.author),
+            joinedload(PostModel.comments).joinedload(CommentModel.author),
+            joinedload(PostModel.comments).joinedload(CommentModel.liked_by),
+            joinedload(PostModel.comments).joinedload(CommentModel.replies).joinedload(CommentModel.author),
+            joinedload(PostModel.comments).joinedload(CommentModel.replies).joinedload(CommentModel.liked_by),
+            joinedload(PostModel.liked_by)
+        ).filter(PostModel.id == db_post.id)
+    )
+    db_post = result.unique().scalar_one()
     
     post_data = PostWithLikeStatus.model_validate(db_post)
-    
-    # Notify via WebSocket
-    await websocket_manager.broadcast_message(WebSocketMessage(
-        type="post_created",
-        data=post_data.model_dump(),
-        user_id=user_id,
-        location_filter=post.location_filter
-    ))
     
     return post_data
 
@@ -103,14 +183,20 @@ async def create_post(
 async def get_post(
     post_id: int, 
     user_id: Optional[int] = Query(None),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get a specific post by ID"""
-    post = db.query(PostModel).options(
-        joinedload(PostModel.author),
-        joinedload(PostModel.comments).joinedload(CommentModel.author),
-        joinedload(PostModel.liked_by)
-    ).filter(PostModel.id == post_id).first()
+    result = await db.execute(
+        select(PostModel).options(
+            joinedload(PostModel.author),
+            joinedload(PostModel.comments).joinedload(CommentModel.author),
+            joinedload(PostModel.comments).joinedload(CommentModel.liked_by),
+            joinedload(PostModel.comments).joinedload(CommentModel.replies).joinedload(CommentModel.author),
+            joinedload(PostModel.comments).joinedload(CommentModel.replies).joinedload(CommentModel.liked_by),
+            joinedload(PostModel.liked_by)
+        ).filter(PostModel.id == post_id)
+    )
+    post = result.unique().scalar_one_or_none()
     
     if not post:
         raise HTTPException(
@@ -129,13 +215,12 @@ async def get_post(
 async def update_post(
     post_id: int,
     post_update: PostUpdate,
-    user_id: int,
-    db: Session = Depends(get_db)
+    current_user: UserModel = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
     """Update a post (only by author or admin)"""
-    user = get_current_user(user_id, db)
-    
-    post = db.query(PostModel).filter(PostModel.id == post_id).first()
+    result = await db.execute(select(PostModel).filter(PostModel.id == post_id))
+    post = result.unique().scalar_one_or_none()
     if not post:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -143,7 +228,7 @@ async def update_post(
         )
     
     # Check permissions
-    if post.author_id != user_id and not user.is_admin:
+    if post.author_id != current_user.id and not current_user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You can only edit your own posts"
@@ -153,18 +238,24 @@ async def update_post(
     for field, value in post_update.model_dump(exclude_unset=True).items():
         setattr(post, field, value)
     
-    db.commit()
-    db.refresh(post)
+    await db.commit()
+    await db.refresh(post)
     
     # Reload with relationships
-    post = db.query(PostModel).options(
-        joinedload(PostModel.author),
-        joinedload(PostModel.comments).joinedload(CommentModel.author),
-        joinedload(PostModel.liked_by)
-    ).filter(PostModel.id == post_id).first()
+    result = await db.execute(
+        select(PostModel).options(
+            joinedload(PostModel.author),
+            joinedload(PostModel.comments).joinedload(CommentModel.author),
+            joinedload(PostModel.comments).joinedload(CommentModel.liked_by),
+            joinedload(PostModel.comments).joinedload(CommentModel.replies).joinedload(CommentModel.author),
+            joinedload(PostModel.comments).joinedload(CommentModel.replies).joinedload(CommentModel.liked_by),
+            joinedload(PostModel.liked_by)
+        ).filter(PostModel.id == post_id)
+    )
+    post = result.unique().scalar_one()
     
     post_data = PostWithLikeStatus.model_validate(post)
-    post_data.is_liked_by_user = any(user.id == user_id for user in post.liked_by)
+    post_data.is_liked_by_user = any(user.id == current_user.id for user in post.liked_by)
     
     return post_data
 
@@ -172,13 +263,12 @@ async def update_post(
 @router.delete("/posts/{post_id}")
 async def delete_post(
     post_id: int,
-    user_id: int,
-    db: Session = Depends(get_db)
+    current_user: UserModel = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
     """Delete a post (only by author or admin)"""
-    user = get_current_user(user_id, db)
-    
-    post = db.query(PostModel).filter(PostModel.id == post_id).first()
+    result = await db.execute(select(PostModel).filter(PostModel.id == post_id))
+    post = result.unique().scalar_one_or_none()
     if not post:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -186,22 +276,14 @@ async def delete_post(
         )
     
     # Check permissions
-    if post.author_id != user_id and not user.is_admin:
+    if post.author_id != current_user.id and not current_user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You can only delete your own posts"
         )
     
-    db.delete(post)
-    db.commit()
-    
-    # Notify via WebSocket
-    await websocket_manager.broadcast_message(WebSocketMessage(
-        type="post_deleted",
-        data={"post_id": post_id},
-        user_id=user_id,
-        location_filter=post.location_filter
-    ))
+    await db.delete(post)
+    await db.commit()
     
     return {"message": "Post deleted successfully"}
 
@@ -209,13 +291,14 @@ async def delete_post(
 @router.post("/posts/{post_id}/like", response_model=LikeResponse)
 async def toggle_post_like(
     post_id: int,
-    user_id: int,
-    db: Session = Depends(get_db)
+    current_user: UserModel = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
     """Toggle like on a post"""
-    user = get_current_user(user_id, db)
-    
-    post = db.query(PostModel).options(joinedload(PostModel.liked_by)).filter(PostModel.id == post_id).first()
+    result = await db.execute(
+        select(PostModel).options(joinedload(PostModel.liked_by)).filter(PostModel.id == post_id)
+    )
+    post = result.unique().scalar_one_or_none()
     if not post:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -223,33 +306,21 @@ async def toggle_post_like(
         )
     
     # Check if user already liked the post
-    is_liked = any(liked_user.id == user_id for liked_user in post.liked_by)
+    is_liked = any(liked_user.id == current_user.id for liked_user in post.liked_by)
     
     if is_liked:
         # Remove like
-        post.liked_by = [liked_user for liked_user in post.liked_by if liked_user.id != user_id]
+        post.liked_by = [liked_user for liked_user in post.liked_by if liked_user.id != current_user.id]
         liked = False
     else:
         # Add like
-        post.liked_by.append(user)
+        post.liked_by.append(current_user)
         liked = True
     
-    db.commit()
-    db.refresh(post)
+    await db.commit()
+    await db.refresh(post)
     
     response = LikeResponse(liked=liked, likes_count=post.likes_count)
-    
-    # Notify via WebSocket
-    await websocket_manager.broadcast_message(WebSocketMessage(
-        type="post_like_toggled",
-        data={
-            "post_id": post_id,
-            "liked": liked,
-            "likes_count": post.likes_count
-        },
-        user_id=user_id,
-        location_filter=post.location_filter
-    ))
     
     return response
 
@@ -258,14 +329,13 @@ async def toggle_post_like(
 async def create_comment(
     post_id: int,
     comment: CommentCreate,
-    user_id: int,
-    db: Session = Depends(get_db)
+    current_user: UserModel = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
     """Create a comment on a post"""
-    user = get_current_user(user_id, db)
-    
     # Verify post exists
-    post = db.query(PostModel).filter(PostModel.id == post_id).first()
+    result = await db.execute(select(PostModel).filter(PostModel.id == post_id))
+    post = result.unique().scalar_one_or_none()
     if not post:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -274,7 +344,8 @@ async def create_comment(
     
     # Verify parent comment exists if specified
     if comment.parent_id:
-        parent_comment = db.query(CommentModel).filter(CommentModel.id == comment.parent_id).first()
+        parent_result = await db.execute(select(CommentModel).filter(CommentModel.id == comment.parent_id))
+        parent_comment = parent_result.unique().scalar_one_or_none()
         if not parent_comment or parent_comment.post_id != post_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -284,29 +355,26 @@ async def create_comment(
     # Create comment
     db_comment = CommentModel(
         content=comment.content,
-        author_id=user_id,
+        author_id=current_user.id,
         post_id=post_id,
         parent_id=comment.parent_id
     )
     db.add(db_comment)
-    db.commit()
-    db.refresh(db_comment)
+    await db.commit()
+    await db.refresh(db_comment)
     
     # Load relationships
-    db_comment = db.query(CommentModel).options(
-        joinedload(CommentModel.author),
-        joinedload(CommentModel.liked_by)
-    ).filter(CommentModel.id == db_comment.id).first()
+    result = await db.execute(
+        select(CommentModel).options(
+            joinedload(CommentModel.author),
+            joinedload(CommentModel.liked_by),
+            joinedload(CommentModel.replies).joinedload(CommentModel.author),
+            joinedload(CommentModel.replies).joinedload(CommentModel.liked_by)
+        ).filter(CommentModel.id == db_comment.id)
+    )
+    db_comment = result.unique().scalar_one()
     
     comment_data = CommentWithLikeStatus.model_validate(db_comment)
-    
-    # Notify via WebSocket
-    await websocket_manager.broadcast_message(WebSocketMessage(
-        type="comment_created",
-        data=comment_data.model_dump(),
-        user_id=user_id,
-        location_filter=post.location_filter
-    ))
     
     return comment_data
 
@@ -315,14 +383,18 @@ async def create_comment(
 async def get_comment(
     comment_id: int,
     user_id: Optional[int] = Query(None),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get a specific comment by ID"""
-    comment = db.query(CommentModel).options(
-        joinedload(CommentModel.author),
-        joinedload(CommentModel.liked_by),
-        joinedload(CommentModel.replies).joinedload(CommentModel.author)
-    ).filter(CommentModel.id == comment_id).first()
+    result = await db.execute(
+        select(CommentModel).options(
+            joinedload(CommentModel.author),
+            joinedload(CommentModel.liked_by),
+            joinedload(CommentModel.replies).joinedload(CommentModel.author),
+            joinedload(CommentModel.replies).joinedload(CommentModel.liked_by)
+        ).filter(CommentModel.id == comment_id)
+    )
+    comment = result.unique().scalar_one_or_none()
     
     if not comment:
         raise HTTPException(
@@ -341,13 +413,12 @@ async def get_comment(
 async def update_comment(
     comment_id: int,
     comment_update: CommentUpdate,
-    user_id: int,
-    db: Session = Depends(get_db)
+    current_user: UserModel = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
     """Update a comment (only by author or admin)"""
-    user = get_current_user(user_id, db)
-    
-    comment = db.query(CommentModel).filter(CommentModel.id == comment_id).first()
+    result = await db.execute(select(CommentModel).filter(CommentModel.id == comment_id))
+    comment = result.unique().scalar_one_or_none()
     if not comment:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -355,7 +426,7 @@ async def update_comment(
         )
     
     # Check permissions
-    if comment.author_id != user_id and not user.is_admin:
+    if comment.author_id != current_user.id and not current_user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You can only edit your own comments"
@@ -365,17 +436,20 @@ async def update_comment(
     for field, value in comment_update.model_dump(exclude_unset=True).items():
         setattr(comment, field, value)
     
-    db.commit()
-    db.refresh(comment)
+    await db.commit()
+    await db.refresh(comment)
     
     # Reload with relationships
-    comment = db.query(CommentModel).options(
-        joinedload(CommentModel.author),
-        joinedload(CommentModel.liked_by)
-    ).filter(CommentModel.id == comment_id).first()
+    result = await db.execute(
+        select(CommentModel).options(
+            joinedload(CommentModel.author),
+            joinedload(CommentModel.liked_by)
+        ).filter(CommentModel.id == comment_id)
+    )
+    comment = result.unique().scalar_one()
     
     comment_data = CommentWithLikeStatus.model_validate(comment)
-    comment_data.is_liked_by_user = any(user.id == user_id for user in comment.liked_by)
+    comment_data.is_liked_by_user = any(user.id == current_user.id for user in comment.liked_by)
     
     return comment_data
 
@@ -383,13 +457,12 @@ async def update_comment(
 @router.delete("/comments/{comment_id}")
 async def delete_comment(
     comment_id: int,
-    user_id: int,
-    db: Session = Depends(get_db)
+    current_user: UserModel = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
     """Delete a comment (only by author or admin)"""
-    user = get_current_user(user_id, db)
-    
-    comment = db.query(CommentModel).filter(CommentModel.id == comment_id).first()
+    result = await db.execute(select(CommentModel).filter(CommentModel.id == comment_id))
+    comment = result.unique().scalar_one_or_none()
     if not comment:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -397,25 +470,18 @@ async def delete_comment(
         )
     
     # Check permissions
-    if comment.author_id != user_id and not user.is_admin:
+    if comment.author_id != current_user.id and not current_user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You can only delete your own comments"
         )
     
     # Get post for WebSocket notification
-    post = db.query(PostModel).filter(PostModel.id == comment.post_id).first()
+    result = await db.execute(select(PostModel).filter(PostModel.id == comment.post_id))
+    post = result.unique().scalar_one_or_none()
     
-    db.delete(comment)
-    db.commit()
-    
-    # Notify via WebSocket
-    await websocket_manager.broadcast_message(WebSocketMessage(
-        type="comment_deleted",
-        data={"comment_id": comment_id, "post_id": comment.post_id},
-        user_id=user_id,
-        location_filter=post.location_filter if post else None
-    ))
+    await db.delete(comment)
+    await db.commit()
     
     return {"message": "Comment deleted successfully"}
 
@@ -423,13 +489,14 @@ async def delete_comment(
 @router.post("/comments/{comment_id}/like", response_model=LikeResponse)
 async def toggle_comment_like(
     comment_id: int,
-    user_id: int,
-    db: Session = Depends(get_db)
+    current_user: UserModel = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
     """Toggle like on a comment"""
-    user = get_current_user(user_id, db)
-    
-    comment = db.query(CommentModel).options(joinedload(CommentModel.liked_by)).filter(CommentModel.id == comment_id).first()
+    result = await db.execute(
+        select(CommentModel).options(joinedload(CommentModel.liked_by)).filter(CommentModel.id == comment_id)
+    )
+    comment = result.unique().scalar_one_or_none()
     if not comment:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -437,36 +504,25 @@ async def toggle_comment_like(
         )
     
     # Check if user already liked the comment
-    is_liked = any(liked_user.id == user_id for liked_user in comment.liked_by)
+    is_liked = any(liked_user.id == current_user.id for liked_user in comment.liked_by)
     
     if is_liked:
         # Remove like
-        comment.liked_by = [liked_user for liked_user in comment.liked_by if liked_user.id != user_id]
+        comment.liked_by = [liked_user for liked_user in comment.liked_by if liked_user.id != current_user.id]
         liked = False
     else:
         # Add like
-        comment.liked_by.append(user)
+        comment.liked_by.append(current_user)
         liked = True
     
-    db.commit()
-    db.refresh(comment)
+    await db.commit()
+    await db.refresh(comment)
     
     response = LikeResponse(liked=liked, likes_count=comment.likes_count)
     
-    # Get post for WebSocket notification
-    post = db.query(PostModel).filter(PostModel.id == comment.post_id).first()
-    
-    # Notify via WebSocket
-    await websocket_manager.broadcast_message(WebSocketMessage(
-        type="comment_like_toggled",
-        data={
-            "comment_id": comment_id,
-            "post_id": comment.post_id,
-            "liked": liked,
-            "likes_count": comment.likes_count
-        },
-        user_id=user_id,
-        location_filter=post.location_filter if post else None
-    ))
-    
-    return response 
+    return response
+
+
+@router.head("/posts")
+async def head_posts():
+    return Response(status_code=200) 

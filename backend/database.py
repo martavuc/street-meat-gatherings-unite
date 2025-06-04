@@ -1,24 +1,27 @@
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+# backend/database.py
 import os
+from sqlalchemy.ext.asyncio import (
+    async_sessionmaker,
+    create_async_engine,
+    AsyncSession,
+)
+from sqlalchemy.orm import DeclarativeBase
 
-# Database URL - can be configured via environment variable
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./streetmeat.db")
+# Use SQLite for simplicity
+SQLITE_URL = "sqlite+aiosqlite:///./streetmeat.db"
+DATABASE_URL = os.getenv("DATABASE_URL", SQLITE_URL)
 
-# For development, you can also use SQLite
-# DATABASE_URL = "sqlite:///./streetmeat.db"
+engine = create_async_engine(DATABASE_URL, echo=False, pool_pre_ping=True)
 
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-Base = declarative_base()
+AsyncSessionLocal: async_sessionmaker[AsyncSession] = async_sessionmaker(
+    bind=engine, expire_on_commit=False
+)
 
 
-def get_db():
-    """Database dependency for FastAPI routes"""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close() 
+class Base(DeclarativeBase):
+    pass
+
+
+async def get_db() -> AsyncSession:          # dependency
+    async with AsyncSessionLocal() as session:
+        yield session

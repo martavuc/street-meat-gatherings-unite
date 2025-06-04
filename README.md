@@ -105,7 +105,7 @@ street-meat-gatherings-unite/
 4. **Set up database:**
    ```bash
    # For PostgreSQL (recommended for production)
-   export DATABASE_URL="postgresql://username:password@localhost:5432/streetmeat_db"
+   export DATABASE_URL="postgresql+psycopg://streetmeat:supersecret@localhost:5432/streetmeat"
    
    # For SQLite (development only)
    # Comment out the PostgreSQL URL in database.py and uncomment SQLite

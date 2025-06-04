@@ -4,14 +4,14 @@ from sqlalchemy.orm import Session
 from datetime import timedelta
 from typing import List
 
-from database import get_db
-from models import User as UserModel, PickupLocation as PickupLocationModel, TimeSlot as TimeSlotModel
-from schemas import User, UserCreate, UserUpdate, PickupLocation, TimeSlot, Token
-from auth import (
-    verify_password,
-    get_password_hash,
-    create_access_token,
-    get_current_active_user,
+from ..database import get_db
+from ..models import User as UserModel, PickupLocation as PickupLocationModel, TimeSlot as TimeSlotModel
+from ..schemas import User, UserCreate, UserUpdate, PickupLocation, TimeSlot, Token
+from ..auth import (
+    verify_pw as verify_password,
+    hash_pw as get_password_hash,
+    create_token as create_access_token,
+    get_current_user as get_current_active_user,
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
 

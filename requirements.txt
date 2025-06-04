@@ -1,0 +1,16 @@
+fastapi
+uvicorn[standard]
+SQLAlchemy>=2.0
+psycopg[binary]
+python-dotenv
+python-multidict
+passlib[bcrypt]
+python-jose
+python-multipart
+pydantic
+asyncpg
+google-api-python-client
+google-auth
+google-auth-httplib2
+google-auth-oauthlib
+bcrypt==3.2.2 

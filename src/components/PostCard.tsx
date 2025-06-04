@@ -11,7 +11,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Post, Comment } from "@/lib/api";
+import { Post, Comment, socialAPI } from "@/lib/api";
+import { useToast } from '@/hooks/use-toast';
 import CommentCard from "./CommentCard";
 
 interface PostCardProps {
@@ -37,6 +38,7 @@ const PostCard: React.FC<PostCardProps> = ({
   const [commentText, setCommentText] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(post.content);
+  const { toast } = useToast();
 
   const canEdit = currentUserId && (post.author_id === currentUserId || isAdmin);
   const canDelete = currentUserId && (post.author_id === currentUserId || isAdmin);
@@ -67,6 +69,40 @@ const PostCard: React.FC<PostCardProps> = ({
     }
   };
 
+  const handleLikeComment = async (commentId: number) => {
+    if (!currentUserId) return;
+
+    try {
+      await socialAPI.likeComment(post.id, commentId);
+      // The parent component should refresh the posts to update like counts
+      window.location.reload(); // Simple refresh for now
+    } catch (error) {
+      console.error('Failed to like comment:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update like. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleReplyToComment = async (commentId: number, content: string) => {
+    if (!currentUserId) return;
+
+    try {
+      await socialAPI.createComment(post.id, content, commentId);
+      // The parent component should refresh the posts to show new reply
+      window.location.reload(); // Simple refresh for now
+    } catch (error) {
+      console.error('Failed to reply to comment:', error);
+      toast({
+        title: "Error",
+        description: "Failed to post reply. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getInitials = (name: string) => {
     return name
       .split(" ")
@@ -76,7 +112,7 @@ const PostCard: React.FC<PostCardProps> = ({
   };
 
   return (
-    <Card className="w-full">
+    <Card className="w-full bg-muted/30 rounded-lg border border-muted">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center space-x-3">
@@ -212,17 +248,13 @@ const PostCard: React.FC<PostCardProps> = ({
                 comment={comment}
                 currentUserId={currentUserId}
                 isAdmin={isAdmin}
-                onLike={(commentId) => {
-                  // Handle comment like
-                }}
-                onReply={(commentId, content) => {
-                  // Handle comment reply
-                }}
+                onLike={handleLikeComment}
+                onReply={handleReplyToComment}
                 onEdit={(commentId, content) => {
-                  // Handle comment edit
+                  // Handle comment edit if needed
                 }}
                 onDelete={(commentId) => {
-                  // Handle comment delete
+                  // Handle comment delete if needed
                 }}
               />
             ))}

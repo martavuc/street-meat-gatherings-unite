@@ -2,13 +2,15 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { authAPI } from '@/lib/api';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import LayoutWithHotDogs from '@/components/LayoutWithHotDogs';
 
 const Login = () => {
+  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -21,15 +23,23 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      const response = await authAPI.login(email, password);
-      login(response.token);
+      const { access_token } = await authAPI.login(email, password);
+
+      // 🟢 wait until AuthContext finishes populating user state
+      await login(access_token);
+
+      // after login the AuthContext's hasOrder is up-to-date, but we can also fetch orders now
+      const orders = await authAPI.getMyOrders();
+      const dest = orders.length ? "/community" : "/order";
+
+      navigate(dest);
+
       toast({
         title: "Success!",
         description: "You have been logged in successfully.",
       });
-      navigate('/order');
-    } catch (error) {
-      console.error('Login failed:', error);
+    } catch (err) {
+      console.error("Login failed:", err);
       toast({
         title: "Error",
         description: "Invalid email or password. Please try again.",
@@ -41,9 +51,9 @@ const Login = () => {
   };
 
   return (
-    <div className="container mx-auto py-12 px-4">
-      <div className="max-w-md mx-auto">
-        <Card>
+    <LayoutWithHotDogs>
+    <div className="min-h-screen flex items-start justify-center pt-20 px-4">
+    <Card className="w-full max-w-md rounded-3xl shadow-2xl bg-white/10 backdrop-blur-md">
           <CardHeader>
             <CardTitle>Login</CardTitle>
             <CardDescription>
@@ -96,7 +106,7 @@ const Login = () => {
           </form>
         </Card>
       </div>
-    </div>
+    </LayoutWithHotDogs>
   );
 };
 

@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Wifi, WifiOff } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
+import { RefreshCw } from "lucide-react";
+import { useToast } from '@/hooks/use-toast';
 import { socialAPI, authAPI, Post, User, PickupLocation } from "@/lib/api";
-import { useWebSocket } from "@/hooks/useWebSocket";
 import PostCard from "./PostCard";
 import CreatePost from "./CreatePost";
 
@@ -26,96 +25,6 @@ const SocialFeed: React.FC<SocialFeedProps> = ({
   const [isCreatingPost, setIsCreatingPost] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
-
-  // WebSocket connection for real-time updates
-  const { isConnected, connectionError } = useWebSocket({
-    userId: currentUserId,
-    locationFilter: locationFilter === "all" ? undefined : locationFilter,
-    onMessage: handleWebSocketMessage,
-    onConnect: () => {
-      toast({
-        title: "Connected",
-        description: "Real-time updates enabled",
-      });
-    },
-    onDisconnect: () => {
-      toast({
-        title: "Disconnected",
-        description: "Real-time updates disabled",
-        variant: "destructive",
-      });
-    },
-  });
-
-  function handleWebSocketMessage(message: any) {
-    switch (message.type) {
-      case "post_created":
-        setPosts((prev) => [message.data, ...prev]);
-        break;
-      case "post_deleted":
-        setPosts((prev) => prev.filter((post) => post.id !== message.data.post_id));
-        break;
-      case "post_like_toggled":
-        setPosts((prev) =>
-          prev.map((post) =>
-            post.id === message.data.post_id
-              ? {
-                  ...post,
-                  likes_count: message.data.likes_count,
-                  is_liked_by_user: currentUserId === message.user_id ? message.data.liked : post.is_liked_by_user,
-                }
-              : post
-          )
-        );
-        break;
-      case "comment_created":
-        setPosts((prev) =>
-          prev.map((post) =>
-            post.id === message.data.post_id
-              ? {
-                  ...post,
-                  comments_count: post.comments_count + 1,
-                  comments: [...post.comments, message.data],
-                }
-              : post
-          )
-        );
-        break;
-      case "comment_deleted":
-        setPosts((prev) =>
-          prev.map((post) =>
-            post.id === message.data.post_id
-              ? {
-                  ...post,
-                  comments_count: Math.max(0, post.comments_count - 1),
-                  comments: post.comments.filter((comment) => comment.id !== message.data.comment_id),
-                }
-              : post
-          )
-        );
-        break;
-      case "comment_like_toggled":
-        setPosts((prev) =>
-          prev.map((post) =>
-            post.id === message.data.post_id
-              ? {
-                  ...post,
-                  comments: post.comments.map((comment) =>
-                    comment.id === message.data.comment_id
-                      ? {
-                          ...comment,
-                          likes_count: message.data.likes_count,
-                          is_liked_by_user: currentUserId === message.user_id ? message.data.liked : comment.is_liked_by_user,
-                        }
-                      : comment
-                  ),
-                }
-              : post
-          )
-        );
-        break;
-    }
-  }
 
   const loadInitialData = useCallback(async () => {
     try {
@@ -148,7 +57,9 @@ const SocialFeed: React.FC<SocialFeedProps> = ({
   const loadPosts = useCallback(async () => {
     try {
       const postsData = await socialAPI.getPosts(locationFilter === "all" ? undefined : locationFilter);
-      setPosts(postsData);
+      // Filter out user profile posts from the feed
+      const feedPosts = postsData.filter(post => !post.content.startsWith("USER_PROFILE:"));
+      setPosts(feedPosts);
     } catch (error) {
       console.error("Failed to load posts:", error);
       toast({
@@ -172,6 +83,9 @@ const SocialFeed: React.FC<SocialFeedProps> = ({
       setIsCreatingPost(true);
       await socialAPI.createPost(content, postLocationFilter);
       
+      // Refresh posts to show the new one
+      await loadPosts();
+      
       toast({
         title: "Success",
         description: "Your post has been created!",
@@ -193,6 +107,8 @@ const SocialFeed: React.FC<SocialFeedProps> = ({
 
     try {
       await socialAPI.likePost(postId);
+      // Refresh posts to update like counts
+      await loadPosts();
     } catch (error) {
       console.error("Failed to toggle post like:", error);
       toast({
@@ -208,6 +124,9 @@ const SocialFeed: React.FC<SocialFeedProps> = ({
 
     try {
       await socialAPI.createComment(postId, content);
+      
+      // Refresh posts to show the new comment
+      await loadPosts();
       
       toast({
         title: "Success",
@@ -229,6 +148,9 @@ const SocialFeed: React.FC<SocialFeedProps> = ({
     try {
       await socialAPI.updatePost(postId, { content }, currentUserId);
       
+      // Refresh posts to show the updated content
+      await loadPosts();
+      
       toast({
         title: "Success",
         description: "Your post has been updated!",
@@ -248,6 +170,9 @@ const SocialFeed: React.FC<SocialFeedProps> = ({
 
     try {
       await socialAPI.deletePost(postId, currentUserId);
+      
+      // Refresh posts to remove the deleted post
+      await loadPosts();
       
       toast({
         title: "Success",
@@ -278,27 +203,16 @@ const SocialFeed: React.FC<SocialFeedProps> = ({
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2" />
-          <p className="text-muted-foreground">Loading social feed...</p>
+          <p className="text-muted-foreground">Loading feed...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Connection status */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          {isConnected ? (
-            <Wifi className="h-4 w-4 text-green-500" />
-          ) : (
-            <WifiOff className="h-4 w-4 text-red-500" />
-          )}
-          <span className="text-sm text-muted-foreground">
-            {isConnected ? "Live updates enabled" : "Offline mode"}
-          </span>
-        </div>
-        
+    <div className="space-y-4">
+      {/* Refresh button */}
+      <div className="flex justify-end">
         <Button
           variant="outline"
           size="sm"
@@ -321,39 +235,35 @@ const SocialFeed: React.FC<SocialFeedProps> = ({
       )}
 
       {/* Posts feed */}
-      <div className="space-y-6">
-        {posts.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-xl text-muted-foreground mb-4">
-              No posts yet in this feed.
-            </p>
-            {currentUser && (
-              <p className="text-muted-foreground">
-                Be the first to share something with the community!
+      <ScrollArea className="max-h-[75vh]">
+        <div className="space-y-4 pr-4">
+          {posts.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground mb-4">
+                No posts yet in this feed.
               </p>
-            )}
-          </div>
-        ) : (
-          posts.map((post) => (
-            <PostCard
-              key={post.id}
-              post={post}
-              currentUserId={currentUserId}
-              isAdmin={currentUser?.is_admin}
-              onLike={handleLikePost}
-              onComment={handleCommentOnPost}
-              onEdit={handleEditPost}
-              onDelete={handleDeletePost}
-            />
-          ))
-        )}
-      </div>
-
-      {connectionError && (
-        <div className="text-center py-4">
-          <p className="text-sm text-destructive">{connectionError}</p>
+              {currentUser && (
+                <p className="text-sm text-muted-foreground">
+                  Be the first to share something with the community!
+                </p>
+              )}
+            </div>
+          ) : (
+            posts.map((post) => (
+              <PostCard
+                key={post.id}
+                post={post}
+                currentUserId={currentUserId}
+                isAdmin={currentUser?.is_admin}
+                onLike={handleLikePost}
+                onComment={handleCommentOnPost}
+                onEdit={handleEditPost}
+                onDelete={handleDeletePost}
+              />
+            ))
+          )}
         </div>
-      )}
+      </ScrollArea>
     </div>
   );
 };

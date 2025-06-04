@@ -21,13 +21,13 @@ const CreatePost: React.FC<CreatePostProps> = ({
   isLoading = false,
 }) => {
   const [content, setContent] = useState("");
-  const [locationFilter, setLocationFilter] = useState<string>("");
+  const [locationFilter, setLocationFilter] = useState<string>("all");
 
   const handleSubmit = () => {
     if (content.trim()) {
-      onCreatePost(content.trim(), locationFilter || undefined);
+      onCreatePost(content.trim(), locationFilter === "all" ? undefined : locationFilter);
       setContent("");
-      setLocationFilter("");
+      setLocationFilter("all");
     }
   };
 
@@ -77,7 +77,7 @@ const CreatePost: React.FC<CreatePostProps> = ({
                 <SelectValue placeholder="All locations" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All locations</SelectItem>
+                <SelectItem value="all">All locations</SelectItem>
                 {pickupLocations.map((location) => (
                   <SelectItem key={location.id} value={location.name}>
                     {location.name}
