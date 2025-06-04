@@ -225,7 +225,7 @@ const OrderWizard: React.FC = () => {
                 <CardDescription>Please Venmo before finalising your order</CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col items-center space-y-4">
-                <img src="public/veno_qr.jpg" alt="Venmo QR" className="w-64 h-64 object-contain" />
+                <img src="/veno_qr.jpg" alt="Venmo QR" className="w-64 h-64 object-contain" />
                 <p className="text-lg font-semibold">Please Venmo $5 to <span className="underline">Jack-Fox-21</span></p>
                 <p className="text-sm text-destructive text-center">Your food order will be canceled if Venmo payment isn't confirmed</p>
               </CardContent>
