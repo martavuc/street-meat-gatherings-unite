@@ -47,14 +47,20 @@ app = FastAPI(
 # By default allow localhost for dev. You can supply a comma-separated list of
 # origins in the CORS_ALLOW_ORIGINS env variable for production.
 
-cors_env = os.getenv("CORS_ALLOW_ORIGINS")
+cors_env   = os.getenv("CORS_ALLOW_ORIGINS")          # comma-separated list
+regex_env  = os.getenv("CORS_ALLOW_ORIGIN_REGEX")     # single regex pattern
+
+# ── fallback for local dev ───────────────────────────────────────────
 default_origins = ["http://localhost:5173"]
 
-allow_origins = [o.strip() for o in cors_env.split(",")] if cors_env else default_origins
+allow_origins = [o.strip() for o in cors_env.split(",") if o.strip()] if cors_env else default_origins
+
+# FastAPI's CORSMiddleware ignores allow_origins if "*" is present, so keep it simple
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allow_origins,
+    allow_origins=["*"] if "*" in allow_origins else allow_origins,
+    allow_origin_regex=regex_env,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
