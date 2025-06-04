@@ -48,6 +48,12 @@ app = FastAPI(
 async def root():
     return {"status": "ok"}
 
+@app.head("/", include_in_schema=False)
+async def root_head():
+    # Render7s health checker sends HEAD requests. Return 200 so the
+    # instance is marked healthy and requests are routed to it.
+    return {"status": "ok"}
+
 # Configure CORS origins ------------------------------------------------------
 # By default allow localhost for dev. You can supply a comma-separated list of
 # origins in the CORS_ALLOW_ORIGINS env variable for production.
