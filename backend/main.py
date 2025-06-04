@@ -43,6 +43,11 @@ app = FastAPI(
     lifespan=lifespan,   # tells FastAPI to run the block above
 )
 
+# Add root endpoint for health checks
+@app.get("/", include_in_schema=False)
+async def root():
+    return {"status": "ok"}
+
 # Configure CORS origins ------------------------------------------------------
 # By default allow localhost for dev. You can supply a comma-separated list of
 # origins in the CORS_ALLOW_ORIGINS env variable for production.
