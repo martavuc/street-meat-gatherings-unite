@@ -29,9 +29,11 @@ export default defineConfig(({ mode }) => ({
   define: {
     // Inject the API URL at build time for production
     'process.env.VITE_API_URL': JSON.stringify(
-      mode === 'production' 
-        ? 'https://street-meat-gatherings-unite-5.onrender.com'
-        : process.env.VITE_API_URL || 'http://localhost:8000'
+      // In production read the value that Vercel injects (must be set
+      // in the dashboard) instead of hard-coding the Render slug.
+      process.env.VITE_API_URL || (mode === 'production'
+        ? ''                             // will be undefined if not set
+        : 'http://localhost:8000')
     )
   },
   build: {
