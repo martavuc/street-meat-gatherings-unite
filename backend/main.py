@@ -8,7 +8,8 @@ from __future__ import annotations
 from contextlib import asynccontextmanager   # ← new
 from dotenv import load_dotenv
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware   # ← new
+from fastapi.middleware.cors import CORSMiddleware
+import os
 
 from backend.database import engine, Base
 from backend.auth import router as auth_router
@@ -42,10 +43,18 @@ app = FastAPI(
     lifespan=lifespan,   # tells FastAPI to run the block above
 )
 
-# CORS so your Vite dev-server (localhost:5173) can hit the API
+# Configure CORS origins ------------------------------------------------------
+# By default allow localhost for dev. You can supply a comma-separated list of
+# origins in the CORS_ALLOW_ORIGINS env variable for production.
+
+cors_env = os.getenv("CORS_ALLOW_ORIGINS")
+default_origins = ["http://localhost:5173"]
+
+allow_origins = [o.strip() for o in cors_env.split(",")] if cors_env else default_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
